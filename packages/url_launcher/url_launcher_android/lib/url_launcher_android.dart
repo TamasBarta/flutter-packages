@@ -89,27 +89,32 @@ class UrlLauncherAndroid extends UrlLauncherPlatform {
       case PreferredLaunchMode.platformDefault:
       // Intentionally treat any new values as platformDefault; see comment in
       // supportsMode.
-      // ignore: no_default_cases
+      // ignore: no_default_cases, unreachable_switch_default
       default:
         // By default, open web URLs in the application.
         inApp = url.startsWith('http:') || url.startsWith('https:');
-        break;
     }
 
     final bool succeeded;
     if (inApp) {
       succeeded = await _hostApi.openUrlInApp(
-          url,
-          // Prefer custom tabs unless a webview was specifically requested.
-          options.mode != PreferredLaunchMode.inAppWebView,
-          WebViewOptions(
-              enableJavaScript: options.webViewConfiguration.enableJavaScript,
-              enableDomStorage: options.webViewConfiguration.enableDomStorage,
-              headers: options.webViewConfiguration.headers));
+        url,
+        // Prefer custom tabs unless a webview was specifically requested.
+        options.mode != PreferredLaunchMode.inAppWebView,
+        WebViewOptions(
+          enableJavaScript: options.webViewConfiguration.enableJavaScript,
+          enableDomStorage: options.webViewConfiguration.enableDomStorage,
+          headers: options.webViewConfiguration.headers,
+        ),
+        BrowserOptions(
+          showTitle: options.browserConfiguration.showTitle,
+        ),
+      );
     } else {
       succeeded =
           await _hostApi.launchUrl(url, options.webViewConfiguration.headers);
     }
+
     // TODO(stuartmorgan): Remove this special handling as part of a
     // breaking change to rework failure handling across all platform. The
     // current behavior is backwards compatible with the previous Java error.
@@ -118,6 +123,7 @@ class UrlLauncherAndroid extends UrlLauncherPlatform {
           code: 'ACTIVITY_NOT_FOUND',
           message: 'No Activity found to handle intent { $url }');
     }
+
     return succeeded;
   }
 

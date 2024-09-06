@@ -5,20 +5,27 @@
 import Flutter
 import UIKit
 
-extension FlutterError: Error {}
-
 /// This plugin handles the native side of the integration tests in
 /// example/integration_test/.
 public class TestPlugin: NSObject, FlutterPlugin, HostIntegrationCoreApi {
+
   var flutterAPI: FlutterIntegrationCoreApi
+  var flutterSmallApiOne: FlutterSmallApi
+  var flutterSmallApiTwo: FlutterSmallApi
 
   public static func register(with registrar: FlutterPluginRegistrar) {
     let plugin = TestPlugin(binaryMessenger: registrar.messenger())
     HostIntegrationCoreApiSetup.setUp(binaryMessenger: registrar.messenger(), api: plugin)
+    TestPluginWithSuffix.register(with: registrar, suffix: "suffixOne")
+    TestPluginWithSuffix.register(with: registrar, suffix: "suffixTwo")
   }
 
   init(binaryMessenger: FlutterBinaryMessenger) {
     flutterAPI = FlutterIntegrationCoreApi(binaryMessenger: binaryMessenger)
+    flutterSmallApiOne = FlutterSmallApi(
+      binaryMessenger: binaryMessenger, messageChannelSuffix: "suffixOne")
+    flutterSmallApiTwo = FlutterSmallApi(
+      binaryMessenger: binaryMessenger, messageChannelSuffix: "suffixTwo")
   }
 
   // MARK: HostIntegrationCoreApi implementation
@@ -34,17 +41,22 @@ public class TestPlugin: NSObject, FlutterPlugin, HostIntegrationCoreApi {
   func echo(_ everything: AllNullableTypes?) -> AllNullableTypes? {
     return everything
   }
+  func echo(_ everything: AllNullableTypesWithoutRecursion?) throws
+    -> AllNullableTypesWithoutRecursion?
+  {
+    return everything
+  }
 
   func throwError() throws -> Any? {
-    throw FlutterError(code: "code", message: "message", details: "details")
+    throw PigeonError(code: "code", message: "message", details: "details")
   }
 
   func throwErrorFromVoid() throws {
-    throw FlutterError(code: "code", message: "message", details: "details")
+    throw PigeonError(code: "code", message: "message", details: "details")
   }
 
   func throwFlutterError() throws -> Any? {
-    throw FlutterError(code: "code", message: "message", details: "details")
+    throw PigeonError(code: "code", message: "message", details: "details")
   }
 
   func echo(_ anInt: Int64) -> Int64 {
@@ -71,12 +83,36 @@ public class TestPlugin: NSObject, FlutterPlugin, HostIntegrationCoreApi {
     return anObject
   }
 
-  func echo(_ aList: [Any?]) throws -> [Any?] {
-    return aList
+  func echo(_ list: [Any?]) throws -> [Any?] {
+    return list
   }
 
-  func echo(_ aMap: [String?: Any?]) throws -> [String?: Any?] {
-    return aMap
+  func echo(enumList: [AnEnum?]) throws -> [AnEnum?] {
+    return enumList
+  }
+
+  func echo(classList: [AllNullableTypes?]) throws -> [AllNullableTypes?] {
+    return classList
+  }
+
+  func echo(_ map: [AnyHashable?: Any?]) throws -> [AnyHashable?: Any?] {
+    return map
+  }
+
+  func echo(stringMap: [String?: String?]) throws -> [String?: String?] {
+    return stringMap
+  }
+
+  func echo(intMap: [Int64?: Int64?]) throws -> [Int64?: Int64?] {
+    return intMap
+  }
+
+  func echo(enumMap: [AnEnum?: AnEnum?]) throws -> [AnEnum?: AnEnum?] {
+    return enumMap
+  }
+
+  func echo(classMap: [Int64?: AllNullableTypes?]) throws -> [Int64?: AllNullableTypes?] {
+    return classMap
   }
 
   func echo(_ wrapper: AllClassesWrapper) throws -> AllClassesWrapper {
@@ -87,18 +123,32 @@ public class TestPlugin: NSObject, FlutterPlugin, HostIntegrationCoreApi {
     return anEnum
   }
 
+  func echo(_ anotherEnum: AnotherEnum) throws -> AnotherEnum {
+    return anotherEnum
+  }
+
   func extractNestedNullableString(from wrapper: AllClassesWrapper) -> String? {
     return wrapper.allNullableTypes.aNullableString
   }
 
   func createNestedObject(with nullableString: String?) -> AllClassesWrapper {
-    return AllClassesWrapper(allNullableTypes: AllNullableTypes(aNullableString: nullableString))
+    return AllClassesWrapper(
+      allNullableTypes: AllNullableTypes(aNullableString: nullableString), classList: [],
+      classMap: [:])
   }
 
   func sendMultipleNullableTypes(
     aBool aNullableBool: Bool?, anInt aNullableInt: Int64?, aString aNullableString: String?
   ) -> AllNullableTypes {
     let someThings = AllNullableTypes(
+      aNullableBool: aNullableBool, aNullableInt: aNullableInt, aNullableString: aNullableString)
+    return someThings
+  }
+
+  func sendMultipleNullableTypesWithoutRecursion(
+    aBool aNullableBool: Bool?, anInt aNullableInt: Int64?, aString aNullableString: String?
+  ) throws -> AllNullableTypesWithoutRecursion {
+    let someThings = AllNullableTypesWithoutRecursion(
       aNullableBool: aNullableBool, aNullableInt: aNullableInt, aNullableString: aNullableString)
     return someThings
   }
@@ -143,12 +193,40 @@ public class TestPlugin: NSObject, FlutterPlugin, HostIntegrationCoreApi {
     return aNullableList
   }
 
-  func echoNullable(_ aNullableMap: [String?: Any?]?) throws -> [String?: Any?]? {
-    return aNullableMap
+  func echoNullable(enumList: [AnEnum?]?) throws -> [AnEnum?]? {
+    return enumList
+  }
+
+  func echoNullable(classList: [AllNullableTypes?]?) throws -> [AllNullableTypes?]? {
+    return classList
+  }
+
+  func echoNullable(_ map: [AnyHashable?: Any?]?) throws -> [AnyHashable?: Any?]? {
+    return map
+  }
+
+  func echoNullable(stringMap: [String?: String?]?) throws -> [String?: String?]? {
+    return stringMap
+  }
+
+  func echoNullable(intMap: [Int64?: Int64?]?) throws -> [Int64?: Int64?]? {
+    return intMap
+  }
+
+  func echoNullable(enumMap: [AnEnum?: AnEnum?]?) throws -> [AnEnum?: AnEnum?]? {
+    return enumMap
+  }
+
+  func echoNullable(classMap: [Int64?: AllNullableTypes?]?) throws -> [Int64?: AllNullableTypes?]? {
+    return classMap
   }
 
   func echoNullable(_ anEnum: AnEnum?) throws -> AnEnum? {
     return anEnum
+  }
+
+  func echoNullable(_ anotherEnum: AnotherEnum?) throws -> AnotherEnum? {
+    return anotherEnum
   }
 
   func echoOptional(_ aNullableInt: Int64?) throws -> Int64? {
@@ -164,15 +242,15 @@ public class TestPlugin: NSObject, FlutterPlugin, HostIntegrationCoreApi {
   }
 
   func throwAsyncError(completion: @escaping (Result<Any?, Error>) -> Void) {
-    completion(.failure(FlutterError(code: "code", message: "message", details: "details")))
+    completion(.failure(PigeonError(code: "code", message: "message", details: "details")))
   }
 
   func throwAsyncErrorFromVoid(completion: @escaping (Result<Void, Error>) -> Void) {
-    completion(.failure(FlutterError(code: "code", message: "message", details: "details")))
+    completion(.failure(PigeonError(code: "code", message: "message", details: "details")))
   }
 
   func throwAsyncFlutterError(completion: @escaping (Result<Any?, Error>) -> Void) {
-    completion(.failure(FlutterError(code: "code", message: "message", details: "details")))
+    completion(.failure(PigeonError(code: "code", message: "message", details: "details")))
   }
 
   func echoAsync(_ everything: AllTypes, completion: @escaping (Result<AllTypes, Error>) -> Void) {
@@ -182,6 +260,13 @@ public class TestPlugin: NSObject, FlutterPlugin, HostIntegrationCoreApi {
   func echoAsync(
     _ everything: AllNullableTypes?,
     completion: @escaping (Result<AllNullableTypes?, Error>) -> Void
+  ) {
+    completion(.success(everything))
+  }
+
+  func echoAsync(
+    _ everything: AllNullableTypesWithoutRecursion?,
+    completion: @escaping (Result<AllNullableTypesWithoutRecursion?, Error>) -> Void
   ) {
     completion(.success(everything))
   }
@@ -213,18 +298,60 @@ public class TestPlugin: NSObject, FlutterPlugin, HostIntegrationCoreApi {
     completion(.success(anObject))
   }
 
-  func echoAsync(_ aList: [Any?], completion: @escaping (Result<[Any?], Error>) -> Void) {
-    completion(.success(aList))
+  func echoAsync(_ list: [Any?], completion: @escaping (Result<[Any?], Error>) -> Void) {
+    completion(.success(list))
+  }
+
+  func echoAsync(enumList: [AnEnum?], completion: @escaping (Result<[AnEnum?], Error>) -> Void) {
+    completion(.success(enumList))
   }
 
   func echoAsync(
-    _ aMap: [String?: Any?], completion: @escaping (Result<[String?: Any?], Error>) -> Void
+    classList: [AllNullableTypes?],
+    completion: @escaping (Result<[AllNullableTypes?], Error>) -> Void
   ) {
-    completion(.success(aMap))
+    completion(.success(classList))
+  }
+
+  func echoAsync(
+    _ map: [AnyHashable?: Any?], completion: @escaping (Result<[AnyHashable?: Any?], Error>) -> Void
+  ) {
+    completion(.success(map))
+  }
+
+  func echoAsync(
+    stringMap: [String?: String?], completion: @escaping (Result<[String?: String?], Error>) -> Void
+  ) {
+    completion(.success(stringMap))
+  }
+
+  func echoAsync(
+    intMap: [Int64?: Int64?], completion: @escaping (Result<[Int64?: Int64?], Error>) -> Void
+  ) {
+    completion(.success(intMap))
+  }
+
+  func echoAsync(
+    enumMap: [AnEnum?: AnEnum?], completion: @escaping (Result<[AnEnum?: AnEnum?], Error>) -> Void
+  ) {
+    completion(.success(enumMap))
+  }
+
+  func echoAsync(
+    classMap: [Int64?: AllNullableTypes?],
+    completion: @escaping (Result<[Int64?: AllNullableTypes?], Error>) -> Void
+  ) {
+    completion(.success(classMap))
   }
 
   func echoAsync(_ anEnum: AnEnum, completion: @escaping (Result<AnEnum, Error>) -> Void) {
     completion(.success(anEnum))
+  }
+
+  func echoAsync(
+    _ anotherEnum: AnotherEnum, completion: @escaping (Result<AnotherEnum, Error>) -> Void
+  ) {
+    completion(.success(anotherEnum))
   }
 
   func echoAsyncNullable(_ anInt: Int64?, completion: @escaping (Result<Int64?, Error>) -> Void) {
@@ -256,19 +383,66 @@ public class TestPlugin: NSObject, FlutterPlugin, HostIntegrationCoreApi {
     completion(.success(anObject))
   }
 
-  func echoAsyncNullable(_ aList: [Any?]?, completion: @escaping (Result<[Any?]?, Error>) -> Void) {
-    completion(.success(aList))
+  func echoAsyncNullable(_ list: [Any?]?, completion: @escaping (Result<[Any?]?, Error>) -> Void) {
+    completion(.success(list))
   }
 
   func echoAsyncNullable(
-    _ aMap: [String?: Any?]?, completion: @escaping (Result<[String?: Any?]?, Error>) -> Void
+    enumList: [AnEnum?]?, completion: @escaping (Result<[AnEnum?]?, Error>) -> Void
   ) {
-    completion(.success(aMap))
+    completion(.success(enumList))
   }
 
-  func echoAsyncNullable(_ anEnum: AnEnum?, completion: @escaping (Result<AnEnum?, Error>) -> Void)
-  {
+  func echoAsyncNullable(
+    classList: [AllNullableTypes?]?,
+    completion: @escaping (Result<[AllNullableTypes?]?, Error>) -> Void
+  ) {
+    completion(.success(classList))
+  }
+
+  func echoAsyncNullable(
+    _ map: [AnyHashable?: Any?]?,
+    completion: @escaping (Result<[AnyHashable?: Any?]?, Error>) -> Void
+  ) {
+    completion(.success(map))
+  }
+
+  func echoAsyncNullable(
+    stringMap: [String?: String?]?,
+    completion: @escaping (Result<[String?: String?]?, Error>) -> Void
+  ) {
+    completion(.success(stringMap))
+  }
+
+  func echoAsyncNullable(
+    intMap: [Int64?: Int64?]?, completion: @escaping (Result<[Int64?: Int64?]?, Error>) -> Void
+  ) {
+    completion(.success(intMap))
+  }
+
+  func echoAsyncNullable(
+    enumMap: [AnEnum?: AnEnum?]?, completion: @escaping (Result<[AnEnum?: AnEnum?]?, Error>) -> Void
+  ) {
+    completion(.success(enumMap))
+  }
+
+  func echoAsyncNullable(
+    classMap: [Int64?: AllNullableTypes?]?,
+    completion: @escaping (Result<[Int64?: AllNullableTypes?]?, Error>) -> Void
+  ) {
+    completion(.success(classMap))
+  }
+
+  func echoAsyncNullable(
+    _ anEnum: AnEnum?, completion: @escaping (Result<AnEnum?, Error>) -> Void
+  ) {
     completion(.success(anEnum))
+  }
+
+  func echoAsyncNullable(
+    _ anotherEnum: AnotherEnum?, completion: @escaping (Result<AnotherEnum?, Error>) -> Void
+  ) {
+    completion(.success(anotherEnum))
   }
 
   func callFlutterNoop(completion: @escaping (Result<Void, Error>) -> Void) {
@@ -331,6 +505,20 @@ public class TestPlugin: NSObject, FlutterPlugin, HostIntegrationCoreApi {
     }
   }
 
+  func callFlutterEcho(
+    _ everything: AllNullableTypesWithoutRecursion?,
+    completion: @escaping (Result<AllNullableTypesWithoutRecursion?, Error>) -> Void
+  ) {
+    flutterAPI.echoNullable(everything) { response in
+      switch response {
+      case .success(let res):
+        completion(.success(res))
+      case .failure(let error):
+        completion(.failure(error))
+      }
+    }
+  }
+
   func callFlutterSendMultipleNullableTypes(
     aBool aNullableBool: Bool?,
     anInt aNullableInt: Int64?,
@@ -338,6 +526,24 @@ public class TestPlugin: NSObject, FlutterPlugin, HostIntegrationCoreApi {
     completion: @escaping (Result<AllNullableTypes, Error>) -> Void
   ) {
     flutterAPI.sendMultipleNullableTypes(
+      aBool: aNullableBool,
+      anInt: aNullableInt,
+      aString: aNullableString
+    ) { response in
+      switch response {
+      case .success(let res):
+        completion(.success(res))
+      case .failure(let error):
+        completion(.failure(error))
+      }
+    }
+  }
+
+  func callFlutterSendMultipleNullableTypesWithoutRecursion(
+    aBool aNullableBool: Bool?, anInt aNullableInt: Int64?, aString aNullableString: String?,
+    completion: @escaping (Result<AllNullableTypesWithoutRecursion, Error>) -> Void
+  ) {
+    flutterAPI.sendMultipleNullableTypesWithoutRecursion(
       aBool: aNullableBool,
       anInt: aNullableInt,
       aString: aNullableString
@@ -396,10 +602,10 @@ public class TestPlugin: NSObject, FlutterPlugin, HostIntegrationCoreApi {
   }
 
   func callFlutterEcho(
-    _ aList: FlutterStandardTypedData,
+    _ list: FlutterStandardTypedData,
     completion: @escaping (Result<FlutterStandardTypedData, Error>) -> Void
   ) {
-    flutterAPI.echo(aList) { response in
+    flutterAPI.echo(list) { response in
       switch response {
       case .success(let res):
         completion(.success(res))
@@ -409,8 +615,8 @@ public class TestPlugin: NSObject, FlutterPlugin, HostIntegrationCoreApi {
     }
   }
 
-  func callFlutterEcho(_ aList: [Any?], completion: @escaping (Result<[Any?], Error>) -> Void) {
-    flutterAPI.echo(aList) { response in
+  func callFlutterEcho(_ list: [Any?], completion: @escaping (Result<[Any?], Error>) -> Void) {
+    flutterAPI.echo(list) { response in
       switch response {
       case .success(let res):
         completion(.success(res))
@@ -421,9 +627,9 @@ public class TestPlugin: NSObject, FlutterPlugin, HostIntegrationCoreApi {
   }
 
   func callFlutterEcho(
-    _ aMap: [String?: Any?], completion: @escaping (Result<[String?: Any?], Error>) -> Void
+    enumList: [AnEnum?], completion: @escaping (Result<[AnEnum?], Error>) -> Void
   ) {
-    flutterAPI.echo(aMap) { response in
+    flutterAPI.echo(enumList: enumList) { response in
       switch response {
       case .success(let res):
         completion(.success(res))
@@ -433,8 +639,103 @@ public class TestPlugin: NSObject, FlutterPlugin, HostIntegrationCoreApi {
     }
   }
 
-  func callFlutterEcho(_ anEnum: AnEnum, completion: @escaping (Result<AnEnum, Error>) -> Void) {
+  func callFlutterEcho(
+    classList: [AllNullableTypes?],
+    completion: @escaping (Result<[AllNullableTypes?], Error>) -> Void
+  ) {
+    flutterAPI.echo(classList: classList) { response in
+      switch response {
+      case .success(let res):
+        completion(.success(res))
+      case .failure(let error):
+        completion(.failure(error))
+      }
+    }
+  }
+
+  func callFlutterEcho(
+    _ map: [AnyHashable?: Any?], completion: @escaping (Result<[AnyHashable?: Any?], Error>) -> Void
+  ) {
+    flutterAPI.echo(map) { response in
+      switch response {
+      case .success(let res):
+        completion(.success(res))
+      case .failure(let error):
+        completion(.failure(error))
+      }
+    }
+  }
+
+  func callFlutterEcho(
+    stringMap: [String?: String?], completion: @escaping (Result<[String?: String?], Error>) -> Void
+  ) {
+    flutterAPI.echo(stringMap: stringMap) { response in
+      switch response {
+      case .success(let res):
+        completion(.success(res))
+      case .failure(let error):
+        completion(.failure(error))
+      }
+    }
+  }
+
+  func callFlutterEcho(
+    intMap: [Int64?: Int64?], completion: @escaping (Result<[Int64?: Int64?], Error>) -> Void
+  ) {
+    flutterAPI.echo(intMap: intMap) { response in
+      switch response {
+      case .success(let res):
+        completion(.success(res))
+      case .failure(let error):
+        completion(.failure(error))
+      }
+    }
+  }
+
+  func callFlutterEcho(
+    enumMap: [AnEnum?: AnEnum?], completion: @escaping (Result<[AnEnum?: AnEnum?], Error>) -> Void
+  ) {
+    flutterAPI.echo(enumMap: enumMap) { response in
+      switch response {
+      case .success(let res):
+        completion(.success(res))
+      case .failure(let error):
+        completion(.failure(error))
+      }
+    }
+  }
+
+  func callFlutterEcho(
+    classMap: [Int64?: AllNullableTypes?],
+    completion: @escaping (Result<[Int64?: AllNullableTypes?], Error>) -> Void
+  ) {
+    flutterAPI.echo(classMap: classMap) { response in
+      switch response {
+      case .success(let res):
+        completion(.success(res))
+      case .failure(let error):
+        completion(.failure(error))
+      }
+    }
+  }
+
+  func callFlutterEcho(
+    _ anEnum: AnEnum, completion: @escaping (Result<AnEnum, Error>) -> Void
+  ) {
     flutterAPI.echo(anEnum) { response in
+      switch response {
+      case .success(let res):
+        completion(.success(res))
+      case .failure(let error):
+        completion(.failure(error))
+      }
+    }
+  }
+
+  func callFlutterEcho(
+    _ anotherEnum: AnotherEnum, completion: @escaping (Result<AnotherEnum, Error>) -> Void
+  ) {
+    flutterAPI.echo(anotherEnum) { response in
       switch response {
       case .success(let res):
         completion(.success(res))
@@ -496,10 +797,10 @@ public class TestPlugin: NSObject, FlutterPlugin, HostIntegrationCoreApi {
   }
 
   func callFlutterEchoNullable(
-    _ aList: FlutterStandardTypedData?,
+    _ list: FlutterStandardTypedData?,
     completion: @escaping (Result<FlutterStandardTypedData?, Error>) -> Void
   ) {
-    flutterAPI.echoNullable(aList) { response in
+    flutterAPI.echoNullable(list) { response in
       switch response {
       case .success(let res):
         completion(.success(res))
@@ -510,9 +811,9 @@ public class TestPlugin: NSObject, FlutterPlugin, HostIntegrationCoreApi {
   }
 
   func callFlutterEchoNullable(
-    _ aList: [Any?]?, completion: @escaping (Result<[Any?]?, Error>) -> Void
+    _ list: [Any?]?, completion: @escaping (Result<[Any?]?, Error>) -> Void
   ) {
-    flutterAPI.echoNullable(aList) { response in
+    flutterAPI.echoNullable(list) { response in
       switch response {
       case .success(let res):
         completion(.success(res))
@@ -523,9 +824,9 @@ public class TestPlugin: NSObject, FlutterPlugin, HostIntegrationCoreApi {
   }
 
   func callFlutterEchoNullable(
-    _ aMap: [String?: Any?]?, completion: @escaping (Result<[String?: Any?]?, Error>) -> Void
+    enumList: [AnEnum?]?, completion: @escaping (Result<[AnEnum?]?, Error>) -> Void
   ) {
-    flutterAPI.echoNullable(aMap) { response in
+    flutterAPI.echoNullable(enumList: enumList) { response in
       switch response {
       case .success(let res):
         completion(.success(res))
@@ -535,7 +836,89 @@ public class TestPlugin: NSObject, FlutterPlugin, HostIntegrationCoreApi {
     }
   }
 
-  func callFlutterNullableEcho(
+  func callFlutterEchoNullable(
+    classList: [AllNullableTypes?]?,
+    completion: @escaping (Result<[AllNullableTypes?]?, Error>) -> Void
+  ) {
+    flutterAPI.echoNullable(classList: classList) { response in
+      switch response {
+      case .success(let res):
+        completion(.success(res))
+      case .failure(let error):
+        completion(.failure(error))
+      }
+    }
+  }
+
+  func callFlutterEchoNullable(
+    _ map: [AnyHashable?: Any?]?,
+    completion: @escaping (Result<[AnyHashable?: Any?]?, Error>) -> Void
+  ) {
+    flutterAPI.echoNullable(map) { response in
+      switch response {
+      case .success(let res):
+        completion(.success(res))
+      case .failure(let error):
+        completion(.failure(error))
+      }
+    }
+  }
+
+  func callFlutterEchoNullable(
+    stringMap: [String?: String?]?,
+    completion: @escaping (Result<[String?: String?]?, Error>) -> Void
+  ) {
+    flutterAPI.echoNullable(stringMap: stringMap) { response in
+      switch response {
+      case .success(let res):
+        completion(.success(res))
+      case .failure(let error):
+        completion(.failure(error))
+      }
+    }
+  }
+
+  func callFlutterEchoNullable(
+    intMap: [Int64?: Int64?]?, completion: @escaping (Result<[Int64?: Int64?]?, Error>) -> Void
+  ) {
+    flutterAPI.echoNullable(intMap: intMap) { response in
+      switch response {
+      case .success(let res):
+        completion(.success(res))
+      case .failure(let error):
+        completion(.failure(error))
+      }
+    }
+  }
+
+  func callFlutterEchoNullable(
+    enumMap: [AnEnum?: AnEnum?]?, completion: @escaping (Result<[AnEnum?: AnEnum?]?, Error>) -> Void
+  ) {
+    flutterAPI.echoNullable(enumMap: enumMap) { response in
+      switch response {
+      case .success(let res):
+        completion(.success(res))
+      case .failure(let error):
+        completion(.failure(error))
+      }
+    }
+  }
+
+  func callFlutterEchoNullable(
+    classMap: [Int64?: AllNullableTypes?]?,
+    completion: @escaping (Result<[Int64?: AllNullableTypes?]?, Error>) -> Void
+  ) {
+    flutterAPI.echoNullable(classMap: classMap) { response in
+      switch response {
+      case .success(let res):
+        completion(.success(res))
+      case .failure(let error):
+        completion(.failure(error))
+      }
+    }
+  }
+
+  func callFlutterEchoNullable(
     _ anEnum: AnEnum?, completion: @escaping (Result<AnEnum?, Error>) -> Void
   ) {
     flutterAPI.echoNullable(anEnum) { response in
@@ -547,4 +930,67 @@ public class TestPlugin: NSObject, FlutterPlugin, HostIntegrationCoreApi {
       }
     }
   }
+
+  func callFlutterEchoNullable(
+    _ anotherEnum: AnotherEnum?, completion: @escaping (Result<AnotherEnum?, Error>) -> Void
+  ) {
+    flutterAPI.echoNullable(anotherEnum) { response in
+      switch response {
+      case .success(let res):
+        completion(.success(res))
+      case .failure(let error):
+        completion(.failure(error))
+      }
+    }
+  }
+
+  func callFlutterSmallApiEcho(
+    _ aString: String, completion: @escaping (Result<String, Error>) -> Void
+  ) {
+    flutterSmallApiOne.echo(string: aString) { responseOne in
+      self.flutterSmallApiTwo.echo(string: aString) { responseTwo in
+        switch responseOne {
+        case .success(let resOne):
+          switch responseTwo {
+          case .success(let resTwo):
+            if resOne == resTwo {
+              completion(.success(resOne))
+            } else {
+              completion(
+                .failure(
+                  PigeonError(
+                    code: "",
+                    message: "Multi-instance responses were not matching: \(resOne), \(resTwo)",
+                    details: nil)))
+            }
+          case .failure(let error):
+            completion(.failure(error))
+          }
+        case .failure(let error):
+          completion(.failure(error))
+        }
+      }
+    }
+  }
+
+  func testUnusedClassesGenerate() -> UnusedClass {
+    return UnusedClass()
+  }
+}
+
+public class TestPluginWithSuffix: HostSmallApi {
+  public static func register(with registrar: FlutterPluginRegistrar, suffix: String) {
+    let plugin = TestPluginWithSuffix()
+    HostSmallApiSetup.setUp(
+      binaryMessenger: registrar.messenger(), api: plugin, messageChannelSuffix: suffix)
+  }
+
+  func echo(aString: String, completion: @escaping (Result<String, Error>) -> Void) {
+    completion(.success(aString))
+  }
+
+  func voidVoid(completion: @escaping (Result<Void, Error>) -> Void) {
+    completion(.success(Void()))
+  }
+
 }

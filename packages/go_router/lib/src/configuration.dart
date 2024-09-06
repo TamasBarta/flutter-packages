@@ -150,7 +150,8 @@ class RouteConfiguration {
                 'The default location of a StatefulShellBranch cannot be '
                 'a parameterized route');
           } else {
-            final RouteMatchList matchList = findMatch(branch.initialLocation!);
+            final RouteMatchList matchList =
+                findMatch(Uri.parse(branch.initialLocation!));
             assert(
                 !matchList.isError,
                 'initialLocation (${matchList.uri}) of StatefulShellBranch must '
@@ -216,6 +217,7 @@ class RouteConfiguration {
       matchedLocation: matchList.uri.path,
       extra: matchList.extra,
       pageKey: const ValueKey<String>('topLevel'),
+      topRoute: matchList.lastOrNull?.route,
     );
   }
 
@@ -291,9 +293,7 @@ class RouteConfiguration {
   }
 
   /// Finds the routes that matched the given URL.
-  RouteMatchList findMatch(String location, {Object? extra}) {
-    final Uri uri = Uri.parse(canonicalUri(location));
-
+  RouteMatchList findMatch(Uri uri, {Object? extra}) {
     final Map<String, String> pathParameters = <String, String>{};
     final List<RouteMatchBase> matches =
         _getLocRouteMatches(uri, pathParameters);
@@ -314,14 +314,13 @@ class RouteConfiguration {
 
   /// Reparse the input RouteMatchList
   RouteMatchList reparse(RouteMatchList matchList) {
-    RouteMatchList result =
-        findMatch(matchList.uri.toString(), extra: matchList.extra);
+    RouteMatchList result = findMatch(matchList.uri, extra: matchList.extra);
 
     for (final ImperativeRouteMatch imperativeMatch
         in matchList.matches.whereType<ImperativeRouteMatch>()) {
       final ImperativeRouteMatch match = ImperativeRouteMatch(
           pageKey: imperativeMatch.pageKey,
-          matches: findMatch(imperativeMatch.matches.uri.toString(),
+          matches: findMatch(imperativeMatch.matches.uri,
               extra: imperativeMatch.matches.extra),
           completer: imperativeMatch.completer);
       result = result.push(match);
@@ -393,14 +392,13 @@ class RouteConfiguration {
           return prevMatchList;
         }
 
-        final List<RouteMatch> routeMatches = <RouteMatch>[];
+        final List<RouteMatchBase> routeMatches = <RouteMatchBase>[];
         prevMatchList.visitRouteMatches((RouteMatchBase match) {
-          if (match is RouteMatch) {
+          if (match.route.redirect != null) {
             routeMatches.add(match);
           }
           return true;
         });
-
         final FutureOr<String?> routeLevelRedirectResult =
             _getRouteLevelRedirect(context, prevMatchList, routeMatches, 0);
 
@@ -433,25 +431,22 @@ class RouteConfiguration {
   FutureOr<String?> _getRouteLevelRedirect(
     BuildContext context,
     RouteMatchList matchList,
-    List<RouteMatch> routeMatches,
+    List<RouteMatchBase> routeMatches,
     int currentCheckIndex,
   ) {
     if (currentCheckIndex >= routeMatches.length) {
       return null;
     }
-    final RouteMatch match = routeMatches[currentCheckIndex];
+    final RouteMatchBase match = routeMatches[currentCheckIndex];
     FutureOr<String?> processRouteRedirect(String? newLocation) =>
         newLocation ??
         _getRouteLevelRedirect(
             context, matchList, routeMatches, currentCheckIndex + 1);
-    final GoRoute route = match.route;
-    FutureOr<String?> routeRedirectResult;
-    if (route.redirect != null) {
-      routeRedirectResult = route.redirect!(
-        context,
-        match.buildState(this, matchList),
-      );
-    }
+    final RouteBase route = match.route;
+    final FutureOr<String?> routeRedirectResult = route.redirect!.call(
+      context,
+      match.buildState(this, matchList),
+    );
     if (routeRedirectResult is String?) {
       return processRouteRedirect(routeRedirectResult);
     }
@@ -464,7 +459,7 @@ class RouteConfiguration {
     List<RouteMatchList> redirectHistory,
   ) {
     try {
-      final RouteMatchList newMatch = findMatch(newLocation);
+      final RouteMatchList newMatch = findMatch(Uri.parse(newLocation));
       _addRedirect(redirectHistory, newMatch, previousLocation);
       return newMatch;
     } on GoException catch (e) {
@@ -528,7 +523,8 @@ class RouteConfiguration {
   String debugKnownRoutes() {
     final StringBuffer sb = StringBuffer();
     sb.writeln('Full paths for routes:');
-    _debugFullPathsFor(_routingConfig.value.routes, '', 0, sb);
+    _debugFullPathsFor(
+        _routingConfig.value.routes, '', const <_DecorationType>[], sb);
 
     if (_nameToPath.isNotEmpty) {
       sb.writeln('known full paths for route names:');
@@ -541,15 +537,50 @@ class RouteConfiguration {
   }
 
   void _debugFullPathsFor(List<RouteBase> routes, String parentFullpath,
-      int depth, StringBuffer sb) {
-    for (final RouteBase route in routes) {
+      List<_DecorationType> parentDecoration, StringBuffer sb) {
+    for (final (int index, RouteBase route) in routes.indexed) {
+      final List<_DecorationType> decoration =
+          _getDecoration(parentDecoration, index, routes.length);
+      final String decorationString =
+          decoration.map((_DecorationType e) => e.toString()).join();
+      String path = parentFullpath;
       if (route is GoRoute) {
-        final String fullPath = concatenatePaths(parentFullpath, route.path);
-        sb.writeln('  => ${''.padLeft(depth * 2)}$fullPath');
-        _debugFullPathsFor(route.routes, fullPath, depth + 1, sb);
+        path = concatenatePaths(parentFullpath, route.path);
+        final String? screenName =
+            route.builder?.runtimeType.toString().split('=> ').last;
+        sb.writeln('$decorationString$path '
+            '${screenName == null ? '' : '($screenName)'}');
       } else if (route is ShellRouteBase) {
-        _debugFullPathsFor(route.routes, parentFullpath, depth, sb);
+        sb.writeln('$decorationString (ShellRoute)');
       }
+      _debugFullPathsFor(route.routes, path, decoration, sb);
+    }
+  }
+
+  List<_DecorationType> _getDecoration(
+    List<_DecorationType> parentDecoration,
+    int index,
+    int length,
+  ) {
+    final Iterable<_DecorationType> newDecoration =
+        parentDecoration.map((_DecorationType e) {
+      switch (e) {
+        // swap
+        case _DecorationType.branch:
+          return _DecorationType.parentBranch;
+        case _DecorationType.leaf:
+          return _DecorationType.none;
+        // no swap
+        case _DecorationType.parentBranch:
+          return _DecorationType.parentBranch;
+        case _DecorationType.none:
+          return _DecorationType.none;
+      }
+    });
+    if (index == length - 1) {
+      return <_DecorationType>[...newDecoration, _DecorationType.leaf];
+    } else {
+      return <_DecorationType>[...newDecoration, _DecorationType.branch];
     }
   }
 
@@ -577,4 +608,19 @@ class RouteConfiguration {
       }
     }
   }
+}
+
+enum _DecorationType {
+  parentBranch('│ '),
+  branch('├─'),
+  leaf('└─'),
+  none('  '),
+  ;
+
+  const _DecorationType(this.value);
+
+  final String value;
+
+  @override
+  String toString() => value;
 }

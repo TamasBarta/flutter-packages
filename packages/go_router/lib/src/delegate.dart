@@ -52,27 +52,18 @@ class GoRouterDelegate extends RouterDelegate<RouteMatchList>
 
   @override
   Future<bool> popRoute() async {
-    NavigatorState? state = navigatorKey.currentState;
-    if (state == null) {
-      return false;
-    }
-    if (!state.canPop()) {
-      state = null;
-    }
-    RouteMatchBase walker = currentConfiguration.matches.last;
-    while (walker is ShellRouteMatch) {
-      if (walker.navigatorKey.currentState?.canPop() ?? false) {
-        state = walker.navigatorKey.currentState;
-      }
-      walker = walker.matches.last;
-    }
+    final NavigatorState? state = _findCurrentNavigator();
     if (state != null) {
       return state.maybePop();
     }
     // This should be the only place where the last GoRoute exit the screen.
     final GoRoute lastRoute = currentConfiguration.last.route;
     if (lastRoute.onExit != null && navigatorKey.currentContext != null) {
-      return !(await lastRoute.onExit!(navigatorKey.currentContext!));
+      return !(await lastRoute.onExit!(
+        navigatorKey.currentContext!,
+        currentConfiguration.last
+            .buildState(_configuration, currentConfiguration),
+      ));
     }
     return false;
   }
@@ -94,21 +85,33 @@ class GoRouterDelegate extends RouterDelegate<RouteMatchList>
 
   /// Pops the top-most route.
   void pop<T extends Object?>([T? result]) {
+    final NavigatorState? state = _findCurrentNavigator();
+    if (state == null) {
+      throw GoError('There is nothing to pop');
+    }
+    state.pop(result);
+  }
+
+  NavigatorState? _findCurrentNavigator() {
     NavigatorState? state;
     if (navigatorKey.currentState?.canPop() ?? false) {
       state = navigatorKey.currentState;
     }
     RouteMatchBase walker = currentConfiguration.matches.last;
     while (walker is ShellRouteMatch) {
-      if (walker.navigatorKey.currentState?.canPop() ?? false) {
+      final NavigatorState potentialCandidate =
+          walker.navigatorKey.currentState!;
+      if (!ModalRoute.of(potentialCandidate.context)!.isCurrent) {
+        // There is a pageless route on top of the shell route. it needs to be
+        // popped first.
+        break;
+      }
+      if (potentialCandidate.canPop()) {
         state = walker.navigatorKey.currentState;
       }
       walker = walker.matches.last;
     }
-    if (state == null) {
-      throw GoError('There is nothing to pop');
-    }
-    state.pop(result);
+    return state;
   }
 
   void _debugAssertMatchListNotEmpty() {
@@ -137,8 +140,10 @@ class GoRouterDelegate extends RouterDelegate<RouteMatchList>
     // a microtask in case the onExit callback want to launch dialog or other
     // navigator operations.
     scheduleMicrotask(() async {
-      final bool onExitResult =
-          await routeBase.onExit!(navigatorKey.currentContext!);
+      final bool onExitResult = await routeBase.onExit!(
+        navigatorKey.currentContext!,
+        match.buildState(_configuration, currentConfiguration),
+      );
       if (onExitResult) {
         _completeRouteMatch(result, match);
       }
@@ -147,8 +152,12 @@ class GoRouterDelegate extends RouterDelegate<RouteMatchList>
   }
 
   void _completeRouteMatch(Object? result, RouteMatchBase match) {
-    if (match is ImperativeRouteMatch) {
-      match.complete(result);
+    RouteMatchBase walker = match;
+    while (walker is ShellRouteMatch) {
+      walker = walker.matches.last;
+    }
+    if (walker is ImperativeRouteMatch) {
+      walker.complete(result);
     }
     currentConfiguration = currentConfiguration.remove(match);
     notifyListeners();
@@ -217,14 +226,13 @@ class GoRouterDelegate extends RouterDelegate<RouteMatchList>
       }
 
       if (indexOfFirstDiff < currentGoRouteMatches.length) {
-        final List<GoRoute> exitingGoRoutes = currentGoRouteMatches
-            .sublist(indexOfFirstDiff)
-            .map<RouteBase>((RouteMatch match) => match.route)
-            .whereType<GoRoute>()
-            .toList();
-        return _callOnExitStartsAt(exitingGoRoutes.length - 1,
-                context: navigatorContext, routes: exitingGoRoutes)
-            .then<void>((bool exit) {
+        final List<RouteMatch> exitingMatches =
+            currentGoRouteMatches.sublist(indexOfFirstDiff).toList();
+        return _callOnExitStartsAt(
+          exitingMatches.length - 1,
+          context: navigatorContext,
+          matches: exitingMatches,
+        ).then<void>((bool exit) {
           if (!exit) {
             return SynchronousFuture<void>(null);
           }
@@ -240,24 +248,39 @@ class GoRouterDelegate extends RouterDelegate<RouteMatchList>
   ///
   /// The returned future resolves to true if all routes below the index all
   /// return true. Otherwise, the returned future resolves to false.
-  static Future<bool> _callOnExitStartsAt(int index,
-      {required BuildContext context, required List<GoRoute> routes}) {
+  Future<bool> _callOnExitStartsAt(
+    int index, {
+    required BuildContext context,
+    required List<RouteMatch> matches,
+  }) {
     if (index < 0) {
       return SynchronousFuture<bool>(true);
     }
-    final GoRoute goRoute = routes[index];
+    final RouteMatch match = matches[index];
+    final GoRoute goRoute = match.route;
     if (goRoute.onExit == null) {
-      return _callOnExitStartsAt(index - 1, context: context, routes: routes);
+      return _callOnExitStartsAt(
+        index - 1,
+        context: context,
+        matches: matches,
+      );
     }
 
     Future<bool> handleOnExitResult(bool exit) {
       if (exit) {
-        return _callOnExitStartsAt(index - 1, context: context, routes: routes);
+        return _callOnExitStartsAt(
+          index - 1,
+          context: context,
+          matches: matches,
+        );
       }
       return SynchronousFuture<bool>(false);
     }
 
-    final FutureOr<bool> exitFuture = goRoute.onExit!(context);
+    final FutureOr<bool> exitFuture = goRoute.onExit!(
+      context,
+      match.buildState(_configuration, currentConfiguration),
+    );
     if (exitFuture is bool) {
       return handleOnExitResult(exitFuture);
     }

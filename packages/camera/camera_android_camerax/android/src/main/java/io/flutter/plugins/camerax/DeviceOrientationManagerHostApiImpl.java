@@ -48,6 +48,11 @@ public class DeviceOrientationManagerHostApiImpl implements DeviceOrientationMan
   @Override
   public void startListeningForDeviceOrientationChange(
       @NonNull Boolean isFrontFacing, @NonNull Long sensorOrientation) {
+    if (activity == null) {
+      throw new IllegalStateException(
+          "Activity must be set to start listening for device orientation changes.");
+    }
+
     deviceOrientationManager =
         cameraXProxy.createDeviceOrientationManager(
             activity,
@@ -90,7 +95,8 @@ public class DeviceOrientationManagerHostApiImpl implements DeviceOrientationMan
    * for instance for more information on how this default value is used.
    */
   @Override
-  public @NonNull Long getDefaultDisplayRotation() {
+  @NonNull
+  public Long getDefaultDisplayRotation() {
     int defaultRotation;
     try {
       defaultRotation = deviceOrientationManager.getDefaultRotation();
@@ -100,5 +106,12 @@ public class DeviceOrientationManagerHostApiImpl implements DeviceOrientationMan
     }
 
     return Long.valueOf(defaultRotation);
+  }
+
+  /** Gets current UI orientation based on the current device orientation and rotation. */
+  @Override
+  @NonNull
+  public String getUiOrientation() {
+    return serializeDeviceOrientation(deviceOrientationManager.getUIOrientation());
   }
 }

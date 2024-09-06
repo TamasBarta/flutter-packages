@@ -1,3 +1,8 @@
+## 3.2.0
+
+* Updates platform channels to use Pigeon.
+* Updates minimum supported SDK version to Flutter 3.19/Dart 3.3.
+
 ## 3.1.1
 
 * Implements `launchUrl`.

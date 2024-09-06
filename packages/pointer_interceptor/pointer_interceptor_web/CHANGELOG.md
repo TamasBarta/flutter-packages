@@ -1,3 +1,16 @@
+## NEXT
+
+* Updates minimum supported SDK version to Flutter 3.22/Dart 3.4.
+
+## 0.10.2+1
+
+* Adds support for `web: ^1.0.0`.
+
+## 0.10.2
+
+* Updates web code to package `web: ^0.5.0`.
+* Updates SDK version to Dart `^3.3.0`. Flutter `^3.19.0`.
+
 ## 0.10.1+2
 
 * Fixes "width and height missing" warning on web.

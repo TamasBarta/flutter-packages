@@ -10,10 +10,7 @@ import 'test_helpers.dart';
 
 RouteInformation createRouteInformation(String location, [Object? extra]) {
   return RouteInformation(
-      // TODO(chunhtai): remove this ignore and migrate the code
-      // https://github.com/flutter/flutter/issues/124045.
-      // ignore: deprecated_member_use
-      location: location,
+      uri: Uri.parse(location),
       state:
           RouteInformationState<void>(type: NavigatingType.go, extra: extra));
 }
@@ -30,6 +27,7 @@ void main() {
       redirectLimit: redirectLimit,
       redirect: redirect,
     );
+    addTearDown(router.dispose);
     await tester.pumpWidget(MaterialApp.router(
       routerConfig: router,
     ));
@@ -83,6 +81,157 @@ void main() {
     expect(matches[1].route, routes[0].routes[0]);
   });
 
+  testWidgets('GoRouteInformationParser can handle empty path for non http uri',
+      (WidgetTester tester) async {
+    final List<GoRoute> routes = <GoRoute>[
+      GoRoute(
+        path: '/',
+        builder: (_, __) => const Placeholder(),
+        routes: <GoRoute>[
+          GoRoute(
+            path: 'abc',
+            builder: (_, __) => const Placeholder(),
+          ),
+        ],
+      ),
+    ];
+    final GoRouteInformationParser parser = await createParser(
+      tester,
+      routes: routes,
+      redirectLimit: 100,
+      redirect: (_, __) => null,
+    );
+
+    final BuildContext context = tester.element(find.byType(Router<Object>));
+
+    final RouteMatchList matchesObj =
+        await parser.parseRouteInformationWithDependencies(
+            createRouteInformation('elbaapp://domain'), context);
+    final List<RouteMatchBase> matches = matchesObj.matches;
+    expect(matches.length, 1);
+    expect(matchesObj.uri.toString(), 'elbaapp://domain/');
+  });
+
+  testWidgets('GoRouteInformationParser cleans up uri',
+      (WidgetTester tester) async {
+    final List<GoRoute> routes = <GoRoute>[
+      GoRoute(
+        path: '/',
+        builder: (_, __) => const Placeholder(),
+        routes: <GoRoute>[
+          GoRoute(
+            path: 'abc',
+            builder: (_, __) => const Placeholder(),
+          ),
+        ],
+      ),
+    ];
+    final GoRouteInformationParser parser = await createParser(
+      tester,
+      routes: routes,
+      redirectLimit: 100,
+      redirect: (_, __) => null,
+    );
+
+    final BuildContext context = tester.element(find.byType(Router<Object>));
+
+    final RouteMatchList matchesObj =
+        await parser.parseRouteInformationWithDependencies(
+            createRouteInformation('http://domain/abc/?query=bde'), context);
+    final List<RouteMatchBase> matches = matchesObj.matches;
+    expect(matches.length, 2);
+    expect(matchesObj.uri.toString(), 'http://domain/abc?query=bde');
+  });
+
+  testWidgets(
+      "GoRouteInformationParser can parse deeplink root route and maintain uri's scheme, host, query and fragment",
+      (WidgetTester tester) async {
+    const String expectedScheme = 'https';
+    const String expectedHost = 'www.example.com';
+    const String expectedQuery = 'abc=def';
+    const String expectedFragment = 'abc';
+    const String expectedUriString =
+        '$expectedScheme://$expectedHost/?$expectedQuery#$expectedFragment';
+    final List<GoRoute> routes = <GoRoute>[
+      GoRoute(
+        path: '/',
+        builder: (_, __) => const Placeholder(),
+      ),
+    ];
+    final GoRouteInformationParser parser = await createParser(
+      tester,
+      routes: routes,
+      redirectLimit: 100,
+      redirect: (_, __) => null,
+    );
+
+    final BuildContext context = tester.element(find.byType(Router<Object>));
+
+    final RouteMatchList matchesObj =
+        await parser.parseRouteInformationWithDependencies(
+            createRouteInformation(expectedUriString), context);
+    final List<RouteMatchBase> matches = matchesObj.matches;
+    expect(matches.length, 1);
+    expect(matchesObj.uri.toString(), expectedUriString);
+    expect(matchesObj.uri.scheme, expectedScheme);
+    expect(matchesObj.uri.host, expectedHost);
+    expect(matchesObj.uri.query, expectedQuery);
+    expect(matchesObj.uri.fragment, expectedFragment);
+
+    expect(matches[0].matchedLocation, '/');
+    expect(matches[0].route, routes[0]);
+  });
+
+  testWidgets(
+      "GoRouteInformationParser can parse deeplink route with a path and maintain uri's scheme, host, query and fragment",
+      (WidgetTester tester) async {
+    const String expectedScheme = 'https';
+    const String expectedHost = 'www.example.com';
+    const String expectedPath = '/abc';
+    const String expectedQuery = 'abc=def';
+    const String expectedFragment = 'abc';
+    const String expectedUriString =
+        '$expectedScheme://$expectedHost$expectedPath?$expectedQuery#$expectedFragment';
+    final List<GoRoute> routes = <GoRoute>[
+      GoRoute(
+        path: '/',
+        builder: (_, __) => const Placeholder(),
+        routes: <GoRoute>[
+          GoRoute(
+            path: 'abc',
+            builder: (_, __) => const Placeholder(),
+          ),
+        ],
+      ),
+    ];
+    final GoRouteInformationParser parser = await createParser(
+      tester,
+      routes: routes,
+      redirectLimit: 100,
+      redirect: (_, __) => null,
+    );
+
+    final BuildContext context = tester.element(find.byType(Router<Object>));
+
+    final RouteMatchList matchesObj =
+        await parser.parseRouteInformationWithDependencies(
+            createRouteInformation(expectedUriString), context);
+    final List<RouteMatchBase> matches = matchesObj.matches;
+    expect(matches.length, 2);
+    expect(matchesObj.uri.toString(), expectedUriString);
+    expect(matchesObj.uri.scheme, expectedScheme);
+    expect(matchesObj.uri.host, expectedHost);
+    expect(matchesObj.uri.path, expectedPath);
+    expect(matchesObj.uri.query, expectedQuery);
+    expect(matchesObj.uri.fragment, expectedFragment);
+
+    expect(matches[0].matchedLocation, '/');
+    expect(matches[0].route, routes[0]);
+
+    expect(matches[1].matchedLocation, '/abc');
+    expect(matches[1].route, routes[0].routes[0]);
+  });
+
   testWidgets(
       'GoRouteInformationParser can restore full route matches if optionURLReflectsImperativeAPIs is true',
       (WidgetTester tester) async {
@@ -114,11 +263,7 @@ void main() {
 
     final RouteInformation restoredRouteInformation =
         router.routeInformationParser.restoreRouteInformation(matchList)!;
-    // URL reflects the latest push.
-    // TODO(chunhtai): remove this ignore and migrate the code
-    // https://github.com/flutter/flutter/issues/124045.
-    // ignore: deprecated_member_use
-    expect(restoredRouteInformation.location, '/');
+    expect(restoredRouteInformation.uri.path, '/');
 
     // Can restore back to original RouteMatchList.
     final RouteMatchList parsedRouteMatch = await router.routeInformationParser

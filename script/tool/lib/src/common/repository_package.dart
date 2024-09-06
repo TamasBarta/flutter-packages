@@ -66,28 +66,30 @@ class RepositoryPackage {
   /// The test directory containing the package's Dart tests.
   Directory get testDirectory => directory.childDirectory('test');
 
+  /// The path to the script that is run by the `custom-test` command.
+  File get customTestScript =>
+      directory.childDirectory('tool').childFile('run_tests.dart');
+
+  /// The path to the script that is run before publishing.
+  File get prePublishScript =>
+      directory.childDirectory('tool').childFile('pre_publish.dart');
+
   /// Returns the directory containing support for [platform].
   Directory platformDirectory(FlutterPlatform platform) {
     late final String directoryName;
     switch (platform) {
       case FlutterPlatform.android:
         directoryName = 'android';
-        break;
       case FlutterPlatform.ios:
         directoryName = 'ios';
-        break;
       case FlutterPlatform.linux:
         directoryName = 'linux';
-        break;
       case FlutterPlatform.macos:
         directoryName = 'macos';
-        break;
       case FlutterPlatform.web:
         directoryName = 'web';
-        break;
       case FlutterPlatform.windows:
         directoryName = 'windows';
-        break;
     }
     return directory.childDirectory(directoryName);
   }

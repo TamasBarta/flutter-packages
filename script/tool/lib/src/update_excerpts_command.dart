@@ -92,7 +92,7 @@ class UpdateExcerptsCommand extends PackageLoopingCommand {
         'the resulting changes.\n'
         '\n'
         '${indentation}For more information, see '
-        'https://github.com/flutter/flutter/wiki/Contributing-to-Plugins-and-Packages#readme-code',
+        'https://github.com/flutter/flutter/blob/master/docs/ecosystem/contributing/README.md#readme-code',
       );
       return PackageResult.fail();
     }
@@ -138,23 +138,17 @@ class UpdateExcerptsCommand extends PackageLoopingCommand {
                 switch (extension) {
                   case '':
                     language = 'txt';
-                    break;
                   case '.kt':
                     language = 'kotlin';
-                    break;
                   case '.cc':
                   case '.cpp':
                     language = 'c++';
-                    break;
                   case '.m':
                     language = 'objectivec';
-                    break;
                   case '.gradle':
                     language = 'groovy';
-                    break;
                   default:
                     language = extension.substring(1);
-                    break;
                 }
                 final String section = match.namedGroup('section')!;
                 final String plaster = match.namedGroup('plaster') ?? '···';
@@ -173,7 +167,6 @@ class UpdateExcerptsCommand extends PackageLoopingCommand {
             }
           }
           output.writeln(line);
-          break;
         case _ExcerptParseMode.pragma:
           if (!line.startsWith('```')) {
             errors.add(
@@ -195,7 +188,6 @@ class UpdateExcerptsCommand extends PackageLoopingCommand {
             mode = _ExcerptParseMode.injecting;
           }
           output.writeln(line);
-          break;
         case _ExcerptParseMode.injecting:
           if (line == '```') {
             if (existingBlock.toString() != excerpt) {
@@ -210,7 +202,6 @@ class UpdateExcerptsCommand extends PackageLoopingCommand {
           } else {
             existingBlock.writeln(line);
           }
-          break;
       }
     }
     if (detectedChange) {
@@ -250,23 +241,18 @@ class UpdateExcerptsCommand extends PackageLoopingCommand {
       case 'objectivec':
       case 'swift':
         prefix = '// ';
-        break;
       case 'css':
         prefix = '/* ';
         suffix = ' */';
-        break;
       case 'html':
       case 'xml':
         prefix = '<!--';
         suffix = '-->';
         padding = ' ';
-        break;
       case 'yaml':
         prefix = '# ';
-        break;
       case 'sh':
         prefix = '# ';
-        break;
     }
     final String startRegionMarker = '$prefix#docregion $section$suffix';
     final String endRegionMarker = '$prefix#enddocregion $section$suffix';

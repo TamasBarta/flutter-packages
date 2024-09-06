@@ -1,3 +1,26 @@
+## 1.0.15
+
+* Updates lint checks to ignore NewerVersionAvailable.
+
+## 1.0.14
+
+* Updates AGP version to 8.4.1.
+
+## 1.0.13
+
+* Updates minimum supported SDK version to Flutter 3.22/Dart 3.4.
+* Removes support for apps using the v1 Android embedding.
+
+## 1.0.12
+
+* Switches from using `ShortcutManager` to `ShortcutManagerCompat`.
+
+## 1.0.11
+
+* Updates minSdkVersion to 19.
+* Updates minimum supported SDK version to Flutter 3.16/Dart 3.2.
+* Updates compileSdk version to 34.
+
 ## 1.0.10
 
 * Updates minimum required plugin_platform_interface version to 2.1.7.
